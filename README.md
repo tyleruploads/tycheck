@@ -6,3 +6,5 @@ To install tycheck, simply run
 sudo bash install.sh
 ```
 To uninstall pass --uninstall (or -u)
+
+THIS README IS STILL IN PROGRESS
