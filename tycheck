@@ -1,0 +1,105 @@
+#!/bin/bash -eu
+
+sudo -v
+
+command -v zenity >/dev/null 2>&1 || {  echo "Zenity must be installed. Install with: sudo apt install zenity"; exit 1; }
+
+runner() {
+	# Used to check for a condition than run a command if that condition is met
+	# If passed 2 arguements, it'll eval the second arguement if the first is true
+	# If passed 1 arguement, it'll eval that arguement
+
+	if ((  $# == 1 )); then
+		# "$#" is the arguement count
+		# If there is one arguement
+		echo "Running command: $1"
+		eval "$1"
+	elif ((  $# == 2 )); then
+		# If there are 2 arguements
+		if eval "$1"; then
+			echo "Condition met; running command: $2"
+			eval "$2"
+		else
+			echo "Condition not met; not running: $2"
+		fi
+	fi
+}
+
+
+# Start of cleaning
+# Wrapping in () makes a pulsating bar to show the program is alive when used with zenity pulsating progress
+(
+	echo "# Ensuring operating system speed"
+
+
+	# Clears log files whose size is larger than 50MB
+	runner "sudo journalctl --rotate >/dev/null 2>&1"
+	runner "command -v journalctl" "sudo journalctl --vacuum-size=50M >/dev/null 2>&1"
+
+	# Remove orphaned dependencies with autoremove, remove all cached .deb installers with clean, and kernels
+	# -y is for automatic conframation
+	# --purge removes configs for removed kernels
+	runner "command -v apt" "sudo apt-get autoremove --purge -y && sudo apt-get clean"
+
+	# Remove PageCache (where the kernel stores chunks of recently read or written to files incase you want to read them again)
+	# Remove Dentries (Directory Entries, where the RAM stores paths to Inodes of files). A dentry is a data structure linking a file name to its Inode
+	# Remove Inodes (metadata for files)
+	# These are done simultaniously, not sequentially
+	runner "sudo sysctl -w vm.drop_caches=3"
+
+	# Deletes contents of thumbnails folder if folder exists
+	runner "[ -e ~/.cache/thumbnails ]" "rm -rf ~/.cache/thumbnails/*"
+
+	# Clear files in /tmp that are 1 day old or more
+	# /tmp files are volitale (lost on reboot or shutdown)
+	# -type f filters search to only be for regular files and dosent include subdirecteries
+	# -atime stands for access time, -atime +0 only includes files accessed > 0 days ago, not including fractions
+	# -delete deletes the files that made it through the filter
+	runner "sudo find /tmp -type f -atime +0 -delete"
+
+	# Delete crash dumps
+	runner "sudo rm -rf /var/crash/*"
+
+	# Clear user recycling bin
+	runner "[ -d ~/.local/share/Trash ]" "rm -rf ~/.local/share/Trash/*"
+
+	# Deletes regular files in users cache folder that have not been accessed greater than 2 days ago
+	# This is for every application
+	runner "[ -d ~/.cache ]" "find ~/.cache -type f -atime +2 -delete"
+
+	# Clear user session error logs
+	runner "[ -f ~/.xsession-errors ]" "truncate -s 0 ~/.xsession-errors"
+
+	echo "# Ensuring operating system health"
+
+	# Updates all packages on system installed with APT
+	runner "command -v apt" "sudo DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get upgrade -y"
+
+	# Ensure all apt packages have required dependancies
+	runner "command -v apt" "sudo apt-get check -y"
+
+	echo "# Ensuring hardware speed and health"
+
+	# Ensure drives are healthy if smartctl is installed
+	# || true makes script not exit if no matches found
+	runner "command -v smartctl" "sudo smartctl -A /dev/nvme0n1 | grep -e 'Temperature|Percentage' || true"
+
+	# Sends "TRIM" command to SSDs/NVMes which informs drive which blocks are not in use to increase wp speeds and lifespan
+	# -v is verbose, -a is for all supported mounted filesystems
+	runner "command -v fstrim" "sudo fstrim -va"
+
+	# Reduce swappiness to 10 since SSDs have a limited number of writes
+	runner "sudo sysctl -w vm.swappiness=10"
+
+	# Check for thermal throttling (if the computer is too hot)
+	runner "sudo dmesg | grep -i 'thermal' || true"
+
+	# Update CPU microcode
+	runner "command -v apt" "sudo apt-get install --only-upgrade intel-microcode amd64-microcode"
+
+	# Ensure all changed blocks saved to disk so no slow I/O after script closes
+	runner "sync; sync; sync"
+
+	echo "Completed"
+
+) | tee /dev/tty | zenity --progress --title="tycheck" --text="Processing..." --pulsate --auto-close --width=400 2>/dev/null

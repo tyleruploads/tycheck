@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Tycheck System Maintenance
+Comment=Optimizes speed and health of system and hardware
+Exec=bash -c 'tycheck; echo; read -p "Press Enter to close..." -n1 -s'
+Icon=utilities-terminal
+Terminal=true
+Type=Application
+Categories=System;Settings
