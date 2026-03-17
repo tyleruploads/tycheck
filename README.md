@@ -3,7 +3,7 @@ Tycheck is a performance-optimization utility for Linux environments utilizing t
 ### Installation and uninstallation
 To install tycheck, simply run
 ```bash
-sudo bash install.sh
+sudo bash remote-install.sh
 ```
 To uninstall pass --uninstall (or -u)
 
