@@ -1,6 +1,6 @@
 #!/bin/bash
 
-URL="https://placeholder"
+URL="https://github.com/tyleruploads/tycheck/releases/latest/download/tycheck.tar.gz"
 
 echo "Downloading tycheck"
 
